@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workout Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>&#127947; Workout Tracker</h1>
+      <div class="rank-chip" id="rank-chip" title="Your rank">
+        <span class="rank-chip-icon" id="rank-chip-icon">🥚</span>
+        <span class="rank-chip-name" id="rank-chip-name">Rookie</span>
+      </div>
+      <nav>
+        <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+        <button class="nav-btn" data-view="log">Log Workout</button>
+        <button class="nav-btn" data-view="routines">Routines</button>
+        <button class="nav-btn" data-view="history">History</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- DASHBOARD VIEW -->
+    <section id="view-dashboard" class="view active">
+      <div class="rank-hero" id="rank-hero">
+        <div class="rank-hero-icon" id="rank-hero-icon">🥚</div>
+        <div class="rank-hero-body">
+          <div class="rank-hero-top">
+            <span class="rank-hero-name" id="rank-hero-name">Rookie</span>
+            <span class="rank-hero-xp" id="rank-hero-xp">0 XP</span>
+          </div>
+          <div class="rank-progress-track">
+            <div class="rank-progress-fill" id="rank-progress-fill"></div>
+          </div>
+          <div class="rank-hero-next" id="rank-hero-next">Earn XP by logging workouts</div>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-value" id="stat-total">0</span>
+          <span class="stat-label">Total Workouts</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-week">0</span>
+          <span class="stat-label">This Week</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-streak">0</span>
+          <span class="stat-label">Day Streak</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-volume">0</span>
+          <span class="stat-label">Volume This Week (lbs)</span>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h2>Personal Records</h2>
+      </div>
+      <div id="pr-list" class="pr-grid">
+        <p class="empty-msg">Log some strength workouts to set records!</p>
+      </div>
+
+      <div class="section-header">
+        <h2>Muscle Group Volume <span class="subtle">(this week)</span></h2>
+      </div>
+      <div id="muscle-volume" class="muscle-volume">
+        <p class="empty-msg">Tag exercises with a muscle group to see your weekly split.</p>
+      </div>
+
+      <div class="section-header">
+        <h2>Progress</h2>
+      </div>
+      <div id="progress-section">
+        <div class="progress-controls">
+          <select id="progress-exercise-select">
+            <option value="">-- Select an exercise --</option>
+          </select>
+          <div class="metric-toggle" id="metric-toggle">
+            <button class="metric-btn active" data-metric="weight">Top Weight</button>
+            <button class="metric-btn" data-metric="orm">Est. 1RM</button>
+            <button class="metric-btn" data-metric="volume">Volume</button>
+          </div>
+        </div>
+        <div id="progress-chart-wrap">
+          <canvas id="progress-chart"></canvas>
+          <p class="empty-msg" id="progress-empty">Select an exercise to see progress.</p>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h2>Recent Workouts</h2>
+      </div>
+      <div id="recent-list" class="workout-cards">
+        <p class="empty-msg">No workouts yet. Start logging!</p>
+      </div>
+    </section>
+
+    <!-- LOG WORKOUT VIEW -->
+    <section id="view-log" class="view">
+      <div class="log-layout">
+        <div class="form-card">
+          <h2>Log a Workout</h2>
+
+          <div class="form-row" id="routine-loader-row">
+            <label for="routine-loader">Quick-fill from routine</label>
+            <select id="routine-loader">
+              <option value="">-- None --</option>
+            </select>
+          </div>
+
+          <form id="workout-form">
+            <div class="form-row">
+              <label for="workout-date">Date</label>
+              <input type="date" id="workout-date" required />
+            </div>
+
+            <div class="form-row">
+              <label for="workout-category">Category</label>
+              <select id="workout-category">
+                <option value="Strength">Strength</option>
+                <option value="Cardio">Cardio</option>
+                <option value="Flexibility">Flexibility</option>
+                <option value="Sports">Sports</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label for="workout-exercise">Exercise</label>
+              <input type="text" id="workout-exercise" placeholder="e.g. Bench Press" required autocomplete="off" list="exercise-suggestions" />
+              <datalist id="exercise-suggestions"></datalist>
+            </div>
+
+            <!-- Last-time progressive-overload hint -->
+            <div id="last-time-panel" class="last-time-panel hidden">
+              <span class="last-time-label">Last time</span>
+              <span id="last-time-content"></span>
+            </div>
+
+            <div id="strength-fields">
+              <div class="form-row">
+                <label for="workout-muscle">Muscle Group</label>
+                <select id="workout-muscle">
+                  <option value="">-- Optional --</option>
+                  <option value="Chest">Chest</option>
+                  <option value="Back">Back</option>
+                  <option value="Shoulders">Shoulders</option>
+                  <option value="Arms">Arms</option>
+                  <option value="Legs">Legs</option>
+                  <option value="Core">Core</option>
+                  <option value="Full Body">Full Body</option>
+                </select>
+              </div>
+              <div class="form-row-group">
+                <div class="form-row">
+                  <label for="workout-sets">Sets</label>
+                  <input type="number" id="workout-sets" min="1" max="99" placeholder="3" />
+                </div>
+                <div class="form-row">
+                  <label for="workout-reps">Reps</label>
+                  <input type="number" id="workout-reps" min="1" max="999" placeholder="10" />
+                </div>
+                <div class="form-row">
+                  <label for="workout-weight">Weight (lbs)</label>
+                  <input type="number" id="workout-weight" min="0" step="0.5" placeholder="135" />
+                </div>
+              </div>
+              <div class="est-orm-hint hidden" id="est-orm-hint"></div>
+            </div>
+
+            <div id="cardio-fields" class="hidden">
+              <div class="form-row-group">
+                <div class="form-row">
+                  <label for="workout-duration">Duration (min)</label>
+                  <input type="number" id="workout-duration" min="1" placeholder="30" />
+                </div>
+                <div class="form-row">
+                  <label for="workout-distance">Distance (mi)</label>
+                  <input type="number" id="workout-distance" min="0" step="0.1" placeholder="3.1" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label for="workout-notes">Notes</label>
+              <textarea id="workout-notes" rows="2" placeholder="How did it go?"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Save Workout</button>
+              <button type="button" class="btn-secondary" id="clear-form-btn">Clear</button>
+            </div>
+          </form>
+          <div id="form-success" class="success-msg hidden"></div>
+        </div>
+
+        <!-- REST TIMER -->
+        <aside class="timer-card">
+          <h3>Rest Timer</h3>
+          <div class="timer-display" id="timer-display">0:00</div>
+          <div class="timer-presets">
+            <button class="preset-btn" data-sec="60">1:00</button>
+            <button class="preset-btn" data-sec="90">1:30</button>
+            <button class="preset-btn" data-sec="120">2:00</button>
+            <button class="preset-btn" data-sec="180">3:00</button>
+          </div>
+          <div class="timer-controls">
+            <button class="btn-primary timer-toggle" id="timer-toggle">Start</button>
+            <button class="btn-secondary" id="timer-reset">Reset</button>
+          </div>
+          <p class="timer-hint">Auto-starts when you save a strength set.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ROUTINES VIEW -->
+    <section id="view-routines" class="view">
+      <div class="routines-layout">
+        <!-- Builder -->
+        <div class="form-card">
+          <h2>Build a Routine</h2>
+          <div class="form-row">
+            <label for="routine-name">Routine Name</label>
+            <input type="text" id="routine-name" placeholder="e.g. Push Day" autocomplete="off" />
+          </div>
+
+          <h3 class="builder-subhead">Add Exercises</h3>
+          <div class="form-row">
+            <input type="text" id="rb-exercise" placeholder="Exercise name" autocomplete="off" list="exercise-suggestions" />
+          </div>
+          <div class="form-row">
+            <select id="rb-muscle">
+              <option value="">Muscle group (optional)</option>
+              <option value="Chest">Chest</option>
+              <option value="Back">Back</option>
+              <option value="Shoulders">Shoulders</option>
+              <option value="Arms">Arms</option>
+              <option value="Legs">Legs</option>
+              <option value="Core">Core</option>
+              <option value="Full Body">Full Body</option>
+            </select>
+          </div>
+          <div class="form-row-group">
+            <div class="form-row">
+              <label for="rb-sets">Sets</label>
+              <input type="number" id="rb-sets" min="1" max="99" placeholder="3" />
+            </div>
+            <div class="form-row">
+              <label for="rb-reps">Reps</label>
+              <input type="number" id="rb-reps" min="1" max="999" placeholder="10" />
+            </div>
+            <div class="form-row">
+              <label for="rb-weight">Weight</label>
+              <input type="number" id="rb-weight" min="0" step="0.5" placeholder="135" />
+            </div>
+          </div>
+          <button type="button" class="btn-secondary" id="rb-add-btn">+ Add Exercise</button>
+
+          <ul id="rb-list" class="rb-list"></ul>
+
+          <div class="form-actions">
+            <button type="button" class="btn-primary" id="rb-save-btn">Save Routine</button>
+            <button type="button" class="btn-secondary" id="rb-clear-btn">Clear</button>
+          </div>
+        </div>
+
+        <!-- Saved routines -->
+        <div class="saved-routines">
+          <h2>My Routines</h2>
+          <div id="routines-list">
+            <p class="empty-msg">No routines yet. Build one to get started!</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY VIEW -->
+    <section id="view-history" class="view">
+      <div class="history-controls">
+        <input type="text" id="history-search" placeholder="Search exercises..." />
+        <select id="history-category-filter">
+          <option value="">All Categories</option>
+          <option value="Strength">Strength</option>
+          <option value="Cardio">Cardio</option>
+          <option value="Flexibility">Flexibility</option>
+          <option value="Sports">Sports</option>
+          <option value="Other">Other</option>
+        </select>
+        <button class="btn-secondary" id="export-btn">Export</button>
+        <button class="btn-secondary" id="import-btn">Import</button>
+        <input type="file" id="import-file" accept="application/json" class="hidden" />
+        <button class="btn-danger" id="clear-all-btn">Clear All</button>
+      </div>
+      <div id="history-list">
+        <p class="empty-msg">No workouts logged yet.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- PR celebration toast -->
+  <div id="pr-toast" class="pr-toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
