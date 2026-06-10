@@ -89,11 +89,31 @@ function showView(name) {
   if (name === 'dashboard') renderDashboard();
   if (name === 'history') renderHistory();
   if (name === 'routines') renderRoutines();
+  if (name === 'calendar') renderCalendar();
 }
 
 navBtns.forEach(btn => {
-  btn.addEventListener('click', () => showView(btn.dataset.view));
+  btn.addEventListener('click', () => {
+    showView(btn.dataset.view);
+    closeSidebar();          // collapse the drawer after choosing a tab on mobile
+  });
 });
+
+// ===== SIDEBAR (mobile drawer) =====
+const sidebar = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+
+function openSidebar() {
+  sidebar.classList.add('open');
+  sidebarBackdrop.classList.add('show');
+}
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  sidebarBackdrop.classList.remove('show');
+}
+
+document.getElementById('sidebar-toggle').addEventListener('click', openSidebar);
+sidebarBackdrop.addEventListener('click', closeSidebar);
 
 // ===== FORM LOGIC =====
 const form = document.getElementById('workout-form');
@@ -167,9 +187,9 @@ function fillFormFromExercise(ex) {
   cardioFields.classList.add('hidden');
   exerciseInput.value = ex.exercise || '';
   document.getElementById('workout-muscle').value = ex.muscle || '';
-  setsInput.value   = ex.sets   || '';
-  repsInput.value   = ex.reps   || '';
-  weightInput.value = ex.weight || '';
+  setsInput.value   = ex.sets || '';
+  repsInput.value   = parseFirstNumber(ex.reps)   ?? '';
+  weightInput.value = parseFirstNumber(ex.weight) ?? '';
   updateLastTimePanel();
   updateOrmHint();
   exerciseInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -247,9 +267,6 @@ form.addEventListener('submit', e => {
   successMsg.classList.remove('hidden');
   setTimeout(() => successMsg.classList.add('hidden'), 2800);
 
-  // Auto-start rest timer for strength sets
-  if (!isCardio && entry.weight) startTimer(timerDuration);
-
   resetForm();
 });
 
@@ -311,6 +328,7 @@ function updateExerciseSuggestions() {
 // ===== DASHBOARD =====
 function renderDashboard() {
   renderRank();
+  renderTodayWorkout();
   renderStats();
   renderPRs();
   renderMuscleVolume();
@@ -324,11 +342,17 @@ function renderRank() {
   const info = getRankInfo(computeXP(workouts));
   const { rank, next, xp, progress } = info;
 
-  // Header chip
+  // Sidebar chip
   document.getElementById('rank-chip-icon').textContent = rank.icon;
   document.getElementById('rank-chip-name').textContent = rank.name;
   document.getElementById('rank-chip-name').style.color = rank.color;
   document.getElementById('rank-chip').style.borderColor = rank.color;
+
+  // Mobile top-bar chip (icon only)
+  const mIcon = document.getElementById('rank-chip-icon-mobile');
+  const mChip = document.getElementById('rank-chip-mobile');
+  if (mIcon) mIcon.textContent = rank.icon;
+  if (mChip) mChip.style.borderColor = rank.color;
 
   // Hero card
   const hero = document.getElementById('rank-hero');
@@ -620,6 +644,7 @@ function attachDeleteListeners(container) {
       updateExerciseSuggestions();
       if (document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
       if (document.getElementById('view-history').classList.contains('active')) renderHistory();
+      if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
     });
   });
 }
@@ -719,111 +744,27 @@ function renderProgressChart() {
   });
 }
 
-// ===== REST TIMER =====
-let timerDuration = 90;   // default seconds
-let timerRemaining = 0;
-let timerInterval = null;
-let timerRunning = false;
-
-const timerDisplay = document.getElementById('timer-display');
-const timerToggle = document.getElementById('timer-toggle');
-
-document.querySelectorAll('.preset-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    timerDuration = parseInt(btn.dataset.sec);
-    startTimer(timerDuration);
-  });
-});
-
-timerToggle.addEventListener('click', () => {
-  if (timerRunning) pauseTimer();
-  else if (timerRemaining > 0) resumeTimer();
-  else startTimer(timerDuration);
-});
-
-document.getElementById('timer-reset').addEventListener('click', resetTimer);
-
-function startTimer(seconds) {
-  clearInterval(timerInterval);
-  timerRemaining = seconds;
-  timerRunning = true;
-  timerDisplay.classList.add('running');
-  timerDisplay.classList.remove('done');
-  timerToggle.textContent = 'Pause';
-  updateTimerDisplay();
-  timerInterval = setInterval(tick, 1000);
-}
-
-function resumeTimer() {
-  timerRunning = true;
-  timerToggle.textContent = 'Pause';
-  timerDisplay.classList.add('running');
-  timerInterval = setInterval(tick, 1000);
-}
-
-function pauseTimer() {
-  clearInterval(timerInterval);
-  timerRunning = false;
-  timerToggle.textContent = 'Resume';
-  timerDisplay.classList.remove('running');
-}
-
-function resetTimer() {
-  clearInterval(timerInterval);
-  timerRunning = false;
-  timerRemaining = 0;
-  timerToggle.textContent = 'Start';
-  timerDisplay.classList.remove('running', 'done');
-  updateTimerDisplay();
-}
-
-function tick() {
-  timerRemaining--;
-  updateTimerDisplay();
-  if (timerRemaining <= 0) {
-    clearInterval(timerInterval);
-    timerRunning = false;
-    timerToggle.textContent = 'Start';
-    timerDisplay.classList.remove('running');
-    timerDisplay.classList.add('done');
-    notifyTimerDone();
-  }
-}
-
-function updateTimerDisplay() {
-  const m = Math.floor(Math.max(0, timerRemaining) / 60);
-  const s = Math.max(0, timerRemaining) % 60;
-  timerDisplay.textContent = `${m}:${String(s).padStart(2, '0')}`;
-}
-
-function notifyTimerDone() {
-  // Audible beep via Web Audio API (no external file needed)
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-  } catch { /* audio not available */ }
-}
-
 // ===== ROUTINES =====
-let routineDraft = [];   // exercises being added in the builder
+let routineDraft = [];        // exercises being added in the builder
+let editingRoutineId = null;  // id of the routine being edited (null = creating new)
 
+const rbHeading = document.getElementById('rb-heading');
+const rbSaveBtn = document.getElementById('rb-save-btn');
+const rbFocus = document.getElementById('routine-focus');
+const rbDay = document.getElementById('routine-day');
+const rbCardio = document.getElementById('routine-cardio');
 const rbExercise = document.getElementById('rb-exercise');
 const rbMuscle = document.getElementById('rb-muscle');
 const rbSets = document.getElementById('rb-sets');
 const rbReps = document.getElementById('rb-reps');
 const rbWeight = document.getElementById('rb-weight');
+
+// Build a "sets × reps @ weight" string from a routine exercise (handles ranges)
+function prescriptionStr(ex) {
+  const setsReps = ex.sets && ex.reps ? `${ex.sets} × ${ex.reps}` : (ex.reps || (ex.sets ? `${ex.sets} sets` : ''));
+  const wt = ex.weight ? ` @ ${ex.weight}` : '';
+  return (setsReps + wt).trim();
+}
 
 document.getElementById('rb-add-btn').addEventListener('click', () => {
   const name = rbExercise.value.trim();
@@ -831,9 +772,9 @@ document.getElementById('rb-add-btn').addEventListener('click', () => {
   routineDraft.push({
     exercise: name,
     muscle: rbMuscle.value || null,
-    sets:   parseInt(rbSets.value)   || null,
-    reps:   parseInt(rbReps.value)   || null,
-    weight: parseFloat(rbWeight.value) || null,
+    sets:   parseInt(rbSets.value) || null,
+    reps:   rbReps.value.trim()    || null,   // string: supports ranges like "4-6"
+    weight: rbWeight.value.trim()  || null,   // string: supports "205-215 lb", "BW + 25 lb"
   });
   rbExercise.value = '';
   rbMuscle.value = '';
@@ -848,11 +789,7 @@ function renderRoutineDraft() {
   const list = document.getElementById('rb-list');
   if (!routineDraft.length) { list.innerHTML = ''; return; }
   list.innerHTML = routineDraft.map((ex, i) => {
-    const detail = [
-      ex.muscle,
-      ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null,
-      ex.weight ? `${ex.weight} lbs` : null,
-    ].filter(Boolean).join(' • ');
+    const detail = [ex.muscle, prescriptionStr(ex)].filter(Boolean).join(' • ');
     return `
       <li class="rb-item">
         <span><span class="rb-item-name">${escHtml(ex.exercise)}</span>
@@ -868,24 +805,62 @@ function renderRoutineDraft() {
   });
 }
 
-document.getElementById('rb-clear-btn').addEventListener('click', () => {
-  routineDraft = [];
-  document.getElementById('routine-name').value = '';
-  renderRoutineDraft();
-});
+document.getElementById('rb-clear-btn').addEventListener('click', exitEditMode);
 
-document.getElementById('rb-save-btn').addEventListener('click', () => {
+rbSaveBtn.addEventListener('click', () => {
   const name = document.getElementById('routine-name').value.trim();
   if (!name) { alert('Give your routine a name first.'); return; }
   if (!routineDraft.length) { alert('Add at least one exercise.'); return; }
-  routines.push({ id: Date.now(), name, exercises: routineDraft.slice() });
+
+  const meta = {
+    name,
+    focus: rbFocus.value.trim() || null,
+    day: rbDay.value || null,
+    cardio: rbCardio.value.trim() || null,
+    exercises: routineDraft.slice(),
+  };
+
+  if (editingRoutineId !== null) {
+    // Update the existing routine in place
+    const routine = routines.find(r => r.id === editingRoutineId);
+    if (routine) Object.assign(routine, meta);
+  } else {
+    // Create a new routine
+    routines.push({ id: Date.now(), ...meta });
+  }
+
   saveRoutines(routines);
-  routineDraft = [];
-  document.getElementById('routine-name').value = '';
-  renderRoutineDraft();
+  exitEditMode();
   renderRoutines();
   updateRoutineLoader();
 });
+
+// Load a routine into the builder for editing
+function enterEditMode(routine) {
+  editingRoutineId = routine.id;
+  routineDraft = routine.exercises.map(ex => ({ ...ex }));
+  document.getElementById('routine-name').value = routine.name;
+  rbFocus.value = routine.focus || '';
+  rbDay.value = routine.day || '';
+  rbCardio.value = routine.cardio || '';
+  rbHeading.textContent = `Editing: ${routine.name}`;
+  rbSaveBtn.textContent = 'Update Routine';
+  renderRoutineDraft();
+  rbHeading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Reset the builder back to "create new" state
+function exitEditMode() {
+  editingRoutineId = null;
+  routineDraft = [];
+  document.getElementById('routine-name').value = '';
+  rbFocus.value = '';
+  rbDay.value = '';
+  rbCardio.value = '';
+  rbHeading.textContent = 'Build a Routine';
+  rbSaveBtn.textContent = 'Save Routine';
+  renderRoutineDraft();
+}
 
 function renderRoutines() {
   updateRoutineLoader();
@@ -897,21 +872,34 @@ function renderRoutines() {
   container.innerHTML = routines.map(r => `
     <div class="routine-card" data-id="${r.id}">
       <div class="routine-card-head">
-        <span class="routine-card-title">${escHtml(r.name)}</span>
+        <span class="routine-card-title">
+          ${r.day ? `<span class="routine-day-badge">${escHtml(r.day)}</span>` : ''}
+          ${escHtml(r.name)}
+        </span>
         <span class="routine-card-count">${r.exercises.length} exercise${r.exercises.length > 1 ? 's' : ''}</span>
       </div>
+      ${r.focus ? `<div class="routine-focus">${escHtml(r.focus)}</div>` : ''}
       <ul class="routine-exercises">
         ${r.exercises.map(ex => {
-          const d = [ex.muscle, ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null, ex.weight ? `${ex.weight} lbs` : null]
-            .filter(Boolean).join(' • ');
-          return `<li><span class="re-name">${escHtml(ex.exercise)}</span><span>${escHtml(d)}</span></li>`;
+          const d = prescriptionStr(ex);
+          return `<li><span class="re-name">${escHtml(ex.exercise)}</span><span class="re-detail">${escHtml(d)}</span></li>`;
         }).join('')}
       </ul>
+      ${r.cardio ? `<div class="routine-cardio">🏃 ${escHtml(r.cardio)}</div>` : ''}
       <div class="routine-card-actions">
         <button class="btn-primary routine-log-btn" data-id="${r.id}">Log Today</button>
+        <button class="btn-secondary routine-edit-btn" data-id="${r.id}">Edit</button>
         <button class="btn-danger routine-del-btn" data-id="${r.id}">Delete</button>
       </div>
     </div>`).join('');
+
+  // Edit routine
+  container.querySelectorAll('.routine-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const routine = routines.find(r => r.id === parseInt(btn.dataset.id));
+      if (routine) enterEditMode(routine);
+    });
+  });
 
   // Log entire routine for today
   container.querySelectorAll('.routine-log-btn').forEach(btn => {
@@ -919,24 +907,9 @@ function renderRoutines() {
       const routine = routines.find(r => r.id === parseInt(btn.dataset.id));
       if (!routine) return;
       if (!confirm(`Log all ${routine.exercises.length} exercises from "${routine.name}" for today?`)) return;
-      const today = toDateStr(new Date());
-      let base = Date.now();
-      routine.exercises.forEach((ex, i) => {
-        workouts.unshift({
-          id: base + i,
-          date: today,
-          category: 'Strength',
-          exercise: ex.exercise,
-          muscle: ex.muscle || null,
-          sets: ex.sets || null,
-          reps: ex.reps || null,
-          weight: ex.weight || null,
-          notes: `From routine: ${routine.name}`,
-        });
-      });
-      saveWorkouts(workouts);
-      updateExerciseSuggestions();
-      alert(`Logged ${routine.exercises.length} exercises! 💪`);
+      logRoutineOnDate(routine, toDateStr(new Date()));
+      if (document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+      alert(`Logged ${routine.exercises.length} exercises from "${routine.name}" using the lower end of each range! 💪`);
     });
   });
 
@@ -948,11 +921,275 @@ function renderRoutines() {
       if (routine && confirm(`Delete routine "${routine.name}"?`)) {
         routines = routines.filter(r => r.id !== id);
         saveRoutines(routines);
+        if (editingRoutineId === id) exitEditMode();
         renderRoutines();
         updateRoutineLoader();
       }
     });
   });
+}
+
+// ===== TODAY'S WORKOUT (dashboard) =====
+function renderTodayWorkout() {
+  const el = document.getElementById('today-workout');
+  const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const routine = routines.find(r => r.day === todayName);
+
+  if (!routine) { el.classList.add('hidden'); return; }
+
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <div class="today-left">
+      <div class="today-eyebrow">Today's Workout · ${escHtml(todayName)}</div>
+      <div class="today-name">${escHtml(routine.name)}</div>
+      ${routine.focus ? `<div class="today-focus">${escHtml(routine.focus)}</div>` : ''}
+    </div>
+    <button class="btn-primary" id="today-open-btn">Open Routine →</button>`;
+  document.getElementById('today-open-btn').addEventListener('click', () => showView('routines'));
+}
+
+// ===== CALENDAR =====
+let calYear, calMonth;        // currently viewed month
+let calSelectedDate = null;   // YYYY-MM-DD of the selected day
+
+(function initCalState() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+})();
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function ymd(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
+
+document.getElementById('cal-prev').addEventListener('click', () => {
+  calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+});
+document.getElementById('cal-next').addEventListener('click', () => {
+  calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+});
+document.getElementById('cal-today-btn').addEventListener('click', () => {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  calSelectedDate = toDateStr(now);
+  renderCalendar();
+});
+
+function renderCalendar() {
+  const grid = document.getElementById('cal-grid');
+  document.getElementById('cal-title').textContent =
+    new Date(calYear, calMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const firstWeekday = new Date(calYear, calMonth, 1).getDay();
+  const todayStr = toDateStr(new Date());
+  const monthPrefix = `${calYear}-${pad2(calMonth + 1)}`;
+
+  // Aggregate this month's workouts by day
+  const dayData = {};
+  workouts.forEach(w => {
+    if (w.date && w.date.startsWith(monthPrefix)) {
+      if (!dayData[w.date]) dayData[w.date] = { count: 0, volume: 0 };
+      dayData[w.date].count++;
+      dayData[w.date].volume += entryVolume(w);
+    }
+  });
+  const maxVol = Math.max(1, ...Object.values(dayData).map(d => d.volume));
+
+  // Which weekdays have a scheduled routine
+  const scheduledWeekdays = new Set(routines.filter(r => r.day).map(r => r.day));
+
+  let cells = '';
+  for (let i = 0; i < firstWeekday; i++) cells += '<div class="cal-cell empty"></div>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = ymd(calYear, calMonth, d);
+    const data = dayData[dateStr];
+    const weekdayName = new Date(calYear, calMonth, d).toLocaleDateString('en-US', { weekday: 'long' });
+    const classes = ['cal-cell'];
+
+    if (data) {
+      const ratio = data.volume / maxVol;
+      let level = 1;
+      if (data.volume > 0) {
+        if (ratio > 0.75) level = 4;
+        else if (ratio > 0.5) level = 3;
+        else if (ratio > 0.25) level = 2;
+      }
+      classes.push('l' + level);
+    }
+    if (dateStr === todayStr) classes.push('today');
+    if (dateStr === calSelectedDate) classes.push('selected');
+    if (scheduledWeekdays.has(weekdayName)) classes.push('scheduled');
+
+    const meta = data ? `<div class="cal-cell-meta"><span class="cal-count">${data.count}×</span></div>` : '';
+    cells += `<div class="${classes.join(' ')}" data-date="${dateStr}"><span class="cal-daynum">${d}</span>${meta}</div>`;
+  }
+  grid.innerHTML = cells;
+
+  grid.querySelectorAll('.cal-cell[data-date]').forEach(cell => {
+    cell.addEventListener('click', () => {
+      calSelectedDate = cell.dataset.date;
+      renderCalendar();
+    });
+  });
+
+  renderCalSummary(dayData);
+  renderCalDetail();
+}
+
+function renderCalSummary(dayData) {
+  const vals = Object.values(dayData);
+  const activeDays = vals.length;
+  const totalWorkouts = vals.reduce((s, d) => s + d.count, 0);
+  const totalVolume = vals.reduce((s, d) => s + d.volume, 0);
+  document.getElementById('cal-summary').innerHTML = `
+    <div class="cal-summary-card"><div class="cal-summary-val">${activeDays}</div><div class="cal-summary-label">Active Days</div></div>
+    <div class="cal-summary-card"><div class="cal-summary-val">${totalWorkouts}</div><div class="cal-summary-label">Workouts</div></div>
+    <div class="cal-summary-card"><div class="cal-summary-val">${Math.round(totalVolume).toLocaleString()}</div><div class="cal-summary-label">Volume (lbs)</div></div>`;
+}
+
+function renderCalDetail() {
+  const el = document.getElementById('cal-detail');
+  if (!calSelectedDate) {
+    el.innerHTML = '<p class="empty-msg">Select a day to see what you did — or schedule a routine onto it.</p>';
+    return;
+  }
+
+  const dayWorkouts = workouts.filter(w => w.date === calSelectedDate);
+  const weekdayName = new Date(calSelectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+  const scheduled = routines.filter(r => r.day === weekdayName);
+
+  let html = `<div class="cal-detail-head">${formatDateLabel(calSelectedDate)}</div>`;
+
+  if (scheduled.length) {
+    html += '<div class="cal-detail-sub">Scheduled</div>';
+    html += scheduled.map(r => `
+      <div class="cal-sched-card">
+        <div class="cal-sched-info">
+          <div class="cal-sched-name">${escHtml(r.name)}</div>
+          ${r.focus ? `<div class="cal-sched-focus">${escHtml(r.focus)}</div>` : ''}
+        </div>
+        <button class="btn-primary cal-log-btn" data-id="${r.id}">Log on this day</button>
+      </div>`).join('');
+  }
+
+  html += '<div class="cal-detail-sub">Logged</div>';
+  if (dayWorkouts.length) {
+    html += `<div class="workout-cards">${dayWorkouts.map(w => workoutCardHTML(w)).join('')}</div>`;
+  } else {
+    html += '<p class="empty-msg">Nothing logged on this day.</p>';
+  }
+
+  el.innerHTML = html;
+
+  el.querySelectorAll('.cal-log-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const routine = routines.find(r => r.id === parseInt(btn.dataset.id));
+      if (!routine) return;
+      if (!confirm(`Log all ${routine.exercises.length} exercises from "${routine.name}" on ${formatDateLabel(calSelectedDate)}?`)) return;
+      logRoutineOnDate(routine, calSelectedDate);
+      renderCalendar();
+    });
+  });
+
+  attachDeleteListeners(el);
+}
+
+// Log a routine's exercises onto a specific date (ranges -> lower-bound numbers)
+function logRoutineOnDate(routine, dateStr) {
+  const base = Date.now();
+  routine.exercises.forEach((ex, i) => {
+    workouts.unshift({
+      id: base + i,
+      date: dateStr,
+      category: 'Strength',
+      exercise: ex.exercise,
+      muscle: ex.muscle || null,
+      sets: ex.sets || null,
+      reps: parseFirstNumber(ex.reps),
+      weight: parseFirstNumber(ex.weight),
+      notes: `From routine: ${routine.name}`,
+    });
+  });
+  saveWorkouts(workouts);
+  updateExerciseSuggestions();
+}
+
+// ===== SEED DATA =====
+// The user's 4-day split, pre-loaded once on first run.
+const SEED_FLAG = 'seeded_routines_v1';
+const SEED_ROUTINES = [
+  {
+    name: 'Day 1 — Monday', day: 'Monday',
+    focus: 'Chest · Quads · Front delt · Side delt · Triceps · Calves',
+    cardio: '15-20 min incline treadmill or bike',
+    exercises: [
+      { exercise: 'Flat Barbell Bench Press', muscle: 'Chest', sets: 4, reps: '4-6', weight: '205-215 lb' },
+      { exercise: 'BB Back Squat', muscle: 'Legs', sets: 4, reps: '5-6', weight: '315 lb' },
+      { exercise: 'DB Shoulder Press', muscle: 'Shoulders', sets: 3, reps: '6-8', weight: '65 lb' },
+      { exercise: 'Cable Lateral Raise', muscle: 'Shoulders', sets: 3, reps: '10-12', weight: '80-90 lb stack' },
+      { exercise: 'Overhead Rope Cable Extension', muscle: 'Arms', sets: 3, reps: '8-10', weight: '55-60 lb' },
+      { exercise: 'Single-leg Calf Raise', muscle: 'Legs', sets: 3, reps: '8-10', weight: '200 lb' },
+    ],
+  },
+  {
+    name: 'Day 2 — Tuesday', day: 'Tuesday',
+    focus: 'Back · Hamstrings · Glutes · Rear delt · Biceps · Brachialis · Forearms',
+    cardio: '15-20 min incline treadmill or bike',
+    exercises: [
+      { exercise: 'RDL', muscle: 'Legs', sets: 4, reps: '5-6', weight: '345 lb' },
+      { exercise: 'Neutral Grip Row', muscle: 'Back', sets: 4, reps: '6-8', weight: '170 lb' },
+      { exercise: 'Wide Grip Pull-up', muscle: 'Back', sets: 3, reps: '6-8', weight: 'BW + 10-25 lb' },
+      { exercise: 'Seated Hamstring Curl', muscle: 'Legs', sets: 3, reps: '8-10', weight: '210 lb' },
+      { exercise: 'Rear Delt Cable Fly (single arm)', muscle: 'Shoulders', sets: 3, reps: '12-15', weight: '25-35 lb' },
+      { exercise: 'Incline DB Curl', muscle: 'Arms', sets: 3, reps: '8-10', weight: '40 lb' },
+      { exercise: 'Cable Hammer Curl', muscle: 'Arms', sets: 3, reps: '8-10', weight: '60 lb' },
+      { exercise: 'Wrist Curl', muscle: 'Arms', sets: 3, reps: '8-10', weight: '190 lb' },
+    ],
+  },
+  {
+    name: 'Day 3 — Thursday', day: 'Thursday',
+    focus: 'Chest · Hamstrings · Glutes · Front delt · Biceps · Brachialis · Calves',
+    cardio: '15-20 min incline treadmill or bike',
+    exercises: [
+      { exercise: 'Incline Bench Press', muscle: 'Chest', sets: 4, reps: '6-8', weight: '185 lb' },
+      { exercise: 'Chest Press Machine', muscle: 'Chest', sets: 3, reps: '8-10', weight: '180 lb' },
+      { exercise: 'Hip Thrust', muscle: 'Legs', sets: 3, reps: '8-10', weight: '185-225 lb' },
+      { exercise: 'Lying Leg Curl', muscle: 'Legs', sets: 3, reps: '10-12', weight: '160-180 lb' },
+      { exercise: 'EZ-bar Curl', muscle: 'Arms', sets: 3, reps: '10-12', weight: '85-95 lb' },
+      { exercise: 'Cross-body Hammer Curl', muscle: 'Arms', sets: 3, reps: '10-12', weight: '30-35 lb' },
+      { exercise: 'Single-leg Calf Raise', muscle: 'Legs', sets: 3, reps: '8-10', weight: '200 lb' },
+    ],
+  },
+  {
+    name: 'Day 4 — Friday', day: 'Friday',
+    focus: 'Back · Quads · Side delt · Rear delt · Triceps',
+    cardio: '15-20 min incline treadmill or bike',
+    exercises: [
+      { exercise: 'Weighted Wide Grip Pull-up', muscle: 'Back', sets: 4, reps: '5-7', weight: 'BW + 25-45 lb' },
+      { exercise: 'Seated Cable Row (wide grip)', muscle: 'Back', sets: 3, reps: '8-10', weight: '160-180 lb' },
+      { exercise: 'Leg Press', muscle: 'Legs', sets: 4, reps: '8-10', weight: '400-450 lb' },
+      { exercise: 'Leg Extension', muscle: 'Legs', sets: 3, reps: '8-10', weight: '265 lb' },
+      { exercise: 'Cable Lateral Raise', muscle: 'Shoulders', sets: 3, reps: '12-15', weight: '70-80 lb stack' },
+      { exercise: 'Face Pull', muscle: 'Shoulders', sets: 3, reps: '12-15', weight: '50-65 lb' },
+      { exercise: 'Rope Pushdown', muscle: 'Arms', sets: 3, reps: '8-10', weight: '55-60 lb' },
+      { exercise: 'Dips', muscle: 'Arms', sets: 3, reps: '6-8', weight: 'BW + 10-25 lb' },
+    ],
+  },
+];
+
+// Load the seed routines once. Guarded by a flag so deleting them won't re-add.
+function seedRoutinesIfNeeded() {
+  if (localStorage.getItem(SEED_FLAG)) return;
+  if (routines.length === 0) {
+    const base = Date.now();
+    routines = SEED_ROUTINES.map((r, i) => ({ id: base + i, ...r }));
+    saveRoutines(routines);
+  }
+  localStorage.setItem(SEED_FLAG, '1');
 }
 
 // ===== HELPERS =====
@@ -969,18 +1206,43 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// ===== CHART.JS CDN LOADER =====
+// Extract the first number from a value that may be a string range
+// e.g. "4-6" -> 4, "205-215 lb" -> 205, "BW + 25 lb" -> 25, 60 -> 60
+function parseFirstNumber(val) {
+  if (val == null || val === '') return null;
+  if (typeof val === 'number') return val;
+  const m = String(val).match(/\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+
+// ===== CHART.JS LOADER =====
+// Load the vendored local copy first (works fully offline); fall back to the
+// CDN only if the local file is missing; degrade gracefully if neither loads.
 function loadChartJS(callback) {
   if (window.Chart) { callback(); return; }
-  const script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-  script.onload = callback;
-  script.onerror = () => callback(); // degrade gracefully if offline
-  document.head.appendChild(script);
+  const local = document.createElement('script');
+  local.src = './chart.umd.min.js';
+  local.onload = callback;
+  local.onerror = () => {
+    const cdn = document.createElement('script');
+    cdn.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    cdn.onload = callback;
+    cdn.onerror = () => callback();
+    document.head.appendChild(cdn);
+  };
+  document.head.appendChild(local);
+}
+
+// ===== SERVICE WORKER (offline / installable PWA) =====
+// Only registers over http/https (not file://, where it isn't supported).
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
 }
 
 // ===== INIT =====
-updateTimerDisplay();
+seedRoutinesIfNeeded();
 updateRoutineLoader();
 loadChartJS(() => {
   updateExerciseSuggestions();

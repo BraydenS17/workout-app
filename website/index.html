@@ -2,28 +2,58 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Workout Tracker</title>
+
+  <!-- PWA / installable app -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0f0f13" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- iOS home-screen app -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Workouts" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header>
-    <div class="header-inner">
-      <h1>&#127947; Workout Tracker</h1>
-      <div class="rank-chip" id="rank-chip" title="Your rank">
+  <div class="app-shell">
+
+    <!-- Mobile top bar (hamburger) -->
+    <div class="topbar">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Open menu">&#9776;</button>
+      <span class="topbar-title">&#127947; Workout Tracker</span>
+      <div class="rank-chip" id="rank-chip-mobile" title="Your rank">
+        <span class="rank-chip-icon" id="rank-chip-icon-mobile">🥚</span>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <span class="sidebar-logo">&#127947;</span>
+        <span class="sidebar-brand-text">Workout<br>Tracker</span>
+      </div>
+
+      <nav class="side-nav">
+        <button class="nav-btn active" data-view="dashboard"><span class="nav-ico">📊</span> Dashboard</button>
+        <button class="nav-btn" data-view="log"><span class="nav-ico">📝</span> Log Workout</button>
+        <button class="nav-btn" data-view="routines"><span class="nav-ico">🗂️</span> Routines</button>
+        <button class="nav-btn" data-view="calendar"><span class="nav-ico">🗓️</span> Calendar</button>
+        <button class="nav-btn" data-view="history"><span class="nav-ico">📅</span> History</button>
+      </nav>
+
+      <div class="rank-chip sidebar-rank" id="rank-chip" title="Your rank">
         <span class="rank-chip-icon" id="rank-chip-icon">🥚</span>
         <span class="rank-chip-name" id="rank-chip-name">Rookie</span>
       </div>
-      <nav>
-        <button class="nav-btn active" data-view="dashboard">Dashboard</button>
-        <button class="nav-btn" data-view="log">Log Workout</button>
-        <button class="nav-btn" data-view="routines">Routines</button>
-        <button class="nav-btn" data-view="history">History</button>
-      </nav>
-    </div>
-  </header>
+    </aside>
 
-  <main>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <main>
 
     <!-- DASHBOARD VIEW -->
     <section id="view-dashboard" class="view active">
@@ -40,6 +70,8 @@
           <div class="rank-hero-next" id="rank-hero-next">Earn XP by logging workouts</div>
         </div>
       </div>
+
+      <div id="today-workout" class="today-workout hidden"></div>
 
       <div class="stats-grid">
         <div class="stat-card">
@@ -104,9 +136,8 @@
 
     <!-- LOG WORKOUT VIEW -->
     <section id="view-log" class="view">
-      <div class="log-layout">
-        <div class="form-card">
-          <h2>Log a Workout</h2>
+      <div class="form-card">
+        <h2>Log a Workout</h2>
 
           <div class="form-row" id="routine-loader-row">
             <label for="routine-loader">Quick-fill from routine</label>
@@ -199,24 +230,6 @@
             </div>
           </form>
           <div id="form-success" class="success-msg hidden"></div>
-        </div>
-
-        <!-- REST TIMER -->
-        <aside class="timer-card">
-          <h3>Rest Timer</h3>
-          <div class="timer-display" id="timer-display">0:00</div>
-          <div class="timer-presets">
-            <button class="preset-btn" data-sec="60">1:00</button>
-            <button class="preset-btn" data-sec="90">1:30</button>
-            <button class="preset-btn" data-sec="120">2:00</button>
-            <button class="preset-btn" data-sec="180">3:00</button>
-          </div>
-          <div class="timer-controls">
-            <button class="btn-primary timer-toggle" id="timer-toggle">Start</button>
-            <button class="btn-secondary" id="timer-reset">Reset</button>
-          </div>
-          <p class="timer-hint">Auto-starts when you save a strength set.</p>
-        </aside>
       </div>
     </section>
 
@@ -225,10 +238,33 @@
       <div class="routines-layout">
         <!-- Builder -->
         <div class="form-card">
-          <h2>Build a Routine</h2>
+          <h2 id="rb-heading">Build a Routine</h2>
           <div class="form-row">
             <label for="routine-name">Routine Name</label>
             <input type="text" id="routine-name" placeholder="e.g. Push Day" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <label for="routine-focus">Muscle Focus <span class="optional">(optional)</span></label>
+            <input type="text" id="routine-focus" placeholder="e.g. Chest · Quads · Triceps" autocomplete="off" />
+          </div>
+          <div class="form-row-group two">
+            <div class="form-row">
+              <label for="routine-day">Scheduled Day <span class="optional">(optional)</span></label>
+              <select id="routine-day">
+                <option value="">-- None --</option>
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+                <option value="Saturday">Saturday</option>
+                <option value="Sunday">Sunday</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="routine-cardio">Cardio <span class="optional">(optional)</span></label>
+              <input type="text" id="routine-cardio" placeholder="e.g. 15-20 min incline treadmill" autocomplete="off" />
+            </div>
           </div>
 
           <h3 class="builder-subhead">Add Exercises</h3>
@@ -250,15 +286,15 @@
           <div class="form-row-group">
             <div class="form-row">
               <label for="rb-sets">Sets</label>
-              <input type="number" id="rb-sets" min="1" max="99" placeholder="3" />
+              <input type="number" id="rb-sets" min="1" max="99" placeholder="4" />
             </div>
             <div class="form-row">
               <label for="rb-reps">Reps</label>
-              <input type="number" id="rb-reps" min="1" max="999" placeholder="10" />
+              <input type="text" id="rb-reps" placeholder="4-6" autocomplete="off" />
             </div>
             <div class="form-row">
               <label for="rb-weight">Weight</label>
-              <input type="number" id="rb-weight" min="0" step="0.5" placeholder="135" />
+              <input type="text" id="rb-weight" placeholder="205-215 lb" autocomplete="off" />
             </div>
           </div>
           <button type="button" class="btn-secondary" id="rb-add-btn">+ Add Exercise</button>
@@ -279,6 +315,38 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- CALENDAR VIEW -->
+    <section id="view-calendar" class="view">
+      <div class="cal-header">
+        <button class="cal-nav-btn" id="cal-prev" title="Previous month">&lsaquo;</button>
+        <h2 id="cal-title">Month Year</h2>
+        <button class="cal-nav-btn" id="cal-next" title="Next month">&rsaquo;</button>
+        <button class="btn-secondary" id="cal-today-btn">Today</button>
+      </div>
+
+      <div id="cal-summary" class="cal-summary"></div>
+
+      <div class="cal-weekdays">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+
+      <div class="cal-legend">
+        <span class="cal-legend-label">Less</span>
+        <span class="cal-legend-box l0"></span>
+        <span class="cal-legend-box l1"></span>
+        <span class="cal-legend-box l2"></span>
+        <span class="cal-legend-box l3"></span>
+        <span class="cal-legend-box l4"></span>
+        <span class="cal-legend-label">More volume</span>
+        <span class="cal-legend-sep"></span>
+        <span class="cal-legend-box scheduled"></span>
+        <span class="cal-legend-label">Scheduled day</span>
+      </div>
+
+      <div id="cal-detail" class="cal-detail"></div>
     </section>
 
     <!-- HISTORY VIEW -->
@@ -303,7 +371,9 @@
       </div>
     </section>
 
-  </main>
+    </main>
+
+  </div>
 
   <!-- PR celebration toast -->
   <div id="pr-toast" class="pr-toast hidden"></div>
